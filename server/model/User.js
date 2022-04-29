@@ -1,30 +1,25 @@
-const mongoose = require("mongoose")
+const mongoose = require("mongoose");
 // creating user schema
-const UserSchema = new mongoose.Schema({
-
-    // creating object
-    username: {
-        type: String,
-        required: true,
-        unique: true
+const UserSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Please add a name"],
     },
     email: {
-        type: String,
-        required: true,
-        unique: true
+      type: String,
+      required: [true, "Please add an email"],
+      unique: true,
     },
     password: {
-        type: String,
-        required: true
+      type: String,
+      required: [true, "Please add a password"],
     },
-    profile: {
-        type: String,
-        default: "",
-    }
-},
-    // updated at created at will be included
-    { timestamps: true }
-)
+  },
+  {
+    timestamps: true,
+  }
+);
 
 // finaly support to export the schema
 module.exports = mongoose.model("User", UserSchema);

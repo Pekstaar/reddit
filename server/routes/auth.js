@@ -1,52 +1,92 @@
-// use express in creating the express route
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const asyncHandler = require("express-async-handler");
+const User = require("../model/User");
 const router = require("express").Router();
-const User = require("../model/User")
-const bcrypt = require("bcrypt");
-// first
-// registers
-// if creating something it shold be post method
-router.post("/register", async (req, res) => {
-    // good to use trycatch error to track the error
-    try {
-        // encypting the password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPasswoord = await bcrypt.hash(req.body.password, salt)
-        // remember already we have imported the User schema
-        const newUser = new User(
-            {
-                username: req.body.username,
-                email: req.body.email,
-                password: hashedPasswoord,
-            }
-        );
-        // saving the user
-        const user = await newUser.save();
-        // if everything is success full send respond 
-        res.status(200).json(user)
-    } catch (error) {
-        res.status(500).json(error);
-    }
-})
-// login
-router.post("/login", async (req, res) => {
 
-    try {
-        // already we have imported the user
-        // serching aspecific user in the database
-        const user = await User.findOne({ username: req.body.username })
-        !user && res.status(400).json("wrong credials!")
+// @desc    Register new user
+// @route   POST /api/users
+// @access  Public
+router.post(
+  "/register",
+  asyncHandler(async (req, res) => {
+    const { name, email, password } = req.body;
 
-        // compairing the password
-        const validated = await bcrypt.compare(req.body.password, user.password)
-        // else statement if not validated
-        !validated && res.status(400).json("wrong credials!");
-        // if everthing is correct send to user
-        // taking a specific data without the password
-        const { password, ...others } = user._doc;
-        res.status(200).json(others);
-    } catch (error) {
-        res.status(500).json(error)
+    if (!name || !email || !password) {
+      res.status(400);
+      throw new Error("Please add all fields");
     }
-})
+
+    // Check if user exists
+    const userExists = await User.findOne({ email });
+
+    if (userExists) {
+      res.status(400);
+      throw new Error("User already exists");
+    }
+
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Create user
+    const user = await User.create({
+      name,
+      email,
+      password: hashedPassword,
+    });
+
+    if (user) {
+      res.status(201).json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(400);
+      throw new Error("Invalid user data");
+    }
+  })
+);
+
+// @desc    Authenticate a user
+// @route   POST /api/users/login
+// @access  Public
+router.post(
+  "/login",
+  asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    // Check for user email
+    const user = await User.findOne({ email });
+
+    if (user && (await bcrypt.compare(password, user.password))) {
+      res.json({
+        _id: user.id,
+        name: user.name,
+        email: user.email,
+        token: generateToken(user._id),
+      });
+    } else {
+      res.status(400);
+      throw new Error("Invalid credentials");
+    }
+  })
+);
+
+// @desc    Get user data
+// @route   GET /api/users/me
+// @access  Private
+const getMe = asyncHandler(async (req, res) => {
+  res.status(200).json(req.user);
+});
+
+// Generate JWT
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, {
+    expiresIn: "15d",
+  });
+};
 
 module.exports = router;
